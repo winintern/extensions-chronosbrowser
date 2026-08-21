@@ -1,1 +1,118 @@
 
+(function () {
+    var HOSTNAME = location.hostname || 'unknown';
+    var STORAGE_KEY = 'chronos_darkmode_' + HOSTNAME;
+    var STYLE_ID = 'chronos-dark-mode-style';
+
+    function getLuminance(colorStr) {
+        // фон вида "rgba(0, 0, 0, 0)" (прозрачный) — не удалось определить,
+        // считаем страницу светлой (безопасный дефолт: лучше лишний раз
+        // предложить тёмную тему, чем не предложить вообще)
+        if (!colorStr) return 255;
+        var m = colorStr.match(/[\d.]+/g);
+        if (!m || m.length < 3) return 255;
+        var r = parseFloat(m[0]), g = parseFloat(m[1]), b = parseFloat(m[2]);
+        var a = m.length > 3 ? parseFloat(m[3]) : 1;
+        if (a === 0) return 255; // полностью прозрачный фон — не показатель
+        return 0.299 * r + 0.587 * g + 0.114 * b;
+    }
+
+    function isPageLight() {
+        try {
+            var bodyEl = document.body;
+            var htmlEl = document.documentElement;
+            var bodyBg = bodyEl ? getComputedStyle(bodyEl).backgroundColor : null;
+            var htmlBg = getComputedStyle(htmlEl).backgroundColor;
+            var bg = (bodyBg && getLuminance(bodyBg) !== 255) ? bodyBg : htmlBg;
+            return getLuminance(bg) > 170;
+        } catch (e) {
+            return false; // не смогли определить — лучше не трогать чужую страницу
+        }
+    }
+
+    function applyDark() {
+        if (document.getElementById(STYLE_ID)) return;
+        var style = document.createElement('style');
+        style.id = STYLE_ID;
+        // Классический приём: инвертируем всю страницу через CSS filter,
+        // затем инвертируем обратно медиа-контент (картинки/видео/канвасы),
+        // чтобы они остались в исходных цветах, а не превратились в негатив.
+        style.textContent =
+            'html.chronos-dark-root {' +
+            '  filter: invert(1) hue-rotate(180deg) !important;' +
+            '  background: #fff !important;' +
+            '}' +
+            'html.chronos-dark-root img,' +
+            'html.chronos-dark-root video,' +
+            'html.chronos-dark-root picture,' +
+            'html.chronos-dark-root canvas,' +
+            'html.chronos-dark-root svg image,' +
+            'html.chronos-dark-root iframe {' +
+            '  filter: invert(1) hue-rotate(180deg) !important;' +
+            '}';
+        document.documentElement.appendChild(style);
+        document.documentElement.classList.add('chronos-dark-root');
+    }
+
+    function removeDark() {
+        var el = document.getElementById(STYLE_ID);
+        if (el) el.remove();
+        document.documentElement.classList.remove('chronos-dark-root');
+    }
+
+    function isDarkActive() {
+        return !!document.getElementById(STYLE_ID);
+    }
+
+    function updateButtonAppearance(btn) {
+        // у самой кнопки — встречный invert, чтобы фильтр родителя не
+        // перекрашивал и её саму (двойная инверсия = обратно к норме)
+        btn.style.filter = isDarkActive() ? 'invert(1) hue-rotate(180deg)' : 'none';
+    }
+
+    function addToggleButton() {
+        var btn = document.createElement('div');
+        btn.textContent = '\u{1F319}';
+        btn.title = 'Переключить тёмную тему (ChronosBrowser)';
+        btn.style.cssText =
+            'position:fixed;bottom:16px;right:16px;z-index:2147483647;' +
+            'width:36px;height:36px;border-radius:50%;' +
+            'background:#1d2030;color:#e7c377;border:1px solid #2b2f45;' +
+            'display:flex;align-items:center;justify-content:center;' +
+            'font-size:16px;cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,0.4);' +
+            'user-select:none;';
+        btn.addEventListener('click', function () {
+            if (isDarkActive()) {
+                removeDark();
+                try { localStorage.setItem(STORAGE_KEY, 'off'); } catch (e) {}
+            } else {
+                applyDark();
+                try { localStorage.setItem(STORAGE_KEY, 'on'); } catch (e) {}
+            }
+            updateButtonAppearance(btn);
+        });
+        (document.body || document.documentElement).appendChild(btn);
+        updateButtonAppearance(btn);
+        return btn;
+    }
+
+    function init() {
+        var stored = null;
+        try { stored = localStorage.getItem(STORAGE_KEY); } catch (e) {}
+
+        if (stored === 'on') {
+            applyDark();
+        } else if (stored === 'off') {
+            // пользователь явно отключил тёмную тему на этом сайте — не трогаем
+        } else if (isPageLight()) {
+            applyDark();
+        }
+        addToggleButton();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+    } else {
+        init();
+    }
+})();
