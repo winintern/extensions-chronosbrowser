@@ -1,0 +1,26 @@
+/* Специфичные, хорошо известные контейнеры рекламных сетей — низкий риск
+   ложных срабатываний, т.к. это точные имена классов/id самих сетей. */
+ins.adsbygoogle,
+iframe[id^="google_ads_iframe"],
+div[id^="div-gpt-ad"],
+.trc_rbox_container,
+.ob-widget,
+.OUTBRAIN,
+.mgbox,
+.mgline {
+    display: none !important;
+}
+
+/* Здесь важно: используется ~= (совпадение целого токена в списке классов),
+   а НЕ *= (вхождение подстроки). [class*="ad"] отловил бы и "address",
+   и "gradient", и "header" — классическая ошибка наивных адблокеров.
+   [class~="ad"] сработает только если "ad" — это отдельное слово в списке
+   классов, например class="ad banner", а не часть другого слова. */
+[class~="ad-banner"],
+[id~="ad-banner"],
+[class~="advertisement"],
+[id~="advertisement"],
+[class~="sponsored-content"],
+[id~="sponsored-content"] {
+    display: none !important;
+}
